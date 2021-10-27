@@ -1,0 +1,76 @@
+// the length of time in hours ejected avatars should stay on your land ban list. 
+// -1 = do not ban, 0 = ban forever, 0.5 = ban for half hour
+timeToBan, -1
+
+// if the owner is an estate manager, the system can use estate functionality instead
+useEstate, no
+
+// change how chatty the object is when avatars are ejected
+// silent = no announcements, public = say nearby object, owner = owner say, broadcast = tell everyone in the region
+verbosity, owner
+
+// range is distance in meters the device protects
+// -1 = full sim
+scanRange, -1
+
+// minimum age in days an avatar must be or they will be ejected
+// -1 = disabled
+minAge, -1
+
+// maximum script memory an avatar can have attached in kilobytes
+// -1 = disabled
+maxScriptMemory, -1
+
+// maximum script time an avatar can have attached in microseconds
+// -1 = disabled
+maxScriptTime, -1
+
+// maximum script count an avatar can have attached
+// -1 = disabled
+maxScriptCount, -1
+
+// maximum render weight an avatar can have
+// -1 = disabled
+maxRenderWeight, -1
+
+// maximum number of inventory items an attachment can contain
+// -1 = disabled
+maxAttachmentInventory, -1
+
+// eject if not in same group
+ejectOnGroup, no
+
+// eject if flying
+ejectOnFlying, no
+
+// eject if avatar is away from keyboard
+ejectOnAfk, no
+
+// eject if avatar has no payment information
+ejectOnNoPayment, no
+
+// eject if avatar has payment information on file but it is not used
+ejectOnUnusedPayment, no
+
+// eject the avatar by teleporting home instead of removing from parcel
+ejectWithTp, no
+
+// show hover text above device? yes/no
+showHoverText, yes
+
+// delay before warning the avatar in seconds (min 0, max 60)
+// -1 = disabled
+ejectDelayAllowedDwell, 15
+
+// delay to remove the avatar in seconds, (min 0, max 60)
+// -1 = disabled
+ejectDelay, 15
+
+// message to send to the avatar if we are delaying their removal
+// comment out this setting to disable sending a warning message
+ejectDelayMessage, {username}, you will be removed in {delay} seconds. Failed checks on: {reason}
+
+// restrict focus to a specific bounding box
+// definition: restrictZone, regionPos, boxSize, boxRotation
+// example: restrictZone, <128,128,1100>, <256, 256, 200>, <0,0,0,1>
+// restrictZone, <128,128,3000>, <256, 256, 200>, <0,0,0,1>
