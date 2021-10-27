@@ -686,7 +686,7 @@ default{
                     "");
             else {
                 securityReady = TRUE;
-                llSetTimerEvent(3);
+                llSetTimerEvent(2.5);
                 llOwnerSay((string)["💾 Memory used ",llRound(llGetUsedMemory()/1024.0),"kb"]);
                 llOwnerSay((string)["📈 Took ",llGetTime(), " seconds"]);
                 llOwnerSay("✔️ System Ready");
