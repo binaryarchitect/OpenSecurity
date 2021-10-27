@@ -99,6 +99,23 @@ integer date2days(string data){
     return days;
 }
 
+// https://wiki.secondlife.com/wiki/Float2String
+string Float2String ( float num, integer places, integer rnd) { 
+    if (rnd) {
+        float f = llPow( 10.0, places );
+        integer i = llRound(llFabs(num) * f);
+        string s = "00000" + (string)i; // number of 0s is (value of max places - 1 )
+        if(num < 0.0)
+            return "-" + (string)( (integer)(i / f) ) + "." + llGetSubString( s, -places, -1);
+        return (string)( (integer)(i / f) ) + "." + llGetSubString( s, -places, -1);
+    }
+    if (!places)
+        return (string)((integer)num );
+    if ( (places = (places - 7 - (places < 1) ) ) & 0x80000000)
+        return llGetSubString((string)num, 0, places);
+    return (string)num;
+}
+
 // http://wiki.secondlife.com/wiki/Geometric#Box_and_Point.2C_Intersection_Boolean
 // Copyright 2001, softSurfer (www.softsurfer.com); 2008, LSL-port by Nexii Malthus
 // This code may be freely used and modified for any purpose
@@ -227,23 +244,30 @@ default{
                                     OBJECT_TOTAL_INVENTORY_COUNT
                                     ]);
                                 if (configMaxScriptMemory != -1 && llList2Float(details, 0) / 1024.0 > configMaxScriptMemory) {
-                                    reason = "script memory";
+                                    reason = (string)["script memory (",
+                                        Float2String(llList2Float(details, 0) / 1024.0, 2, FALSE),"/",
+                                        Float2String(configMaxScriptMemory, 2, FALSE),"kb)"];
                                     eject = TRUE;
                                 }
                                 else if (configMaxScriptTime != -1 && llList2Float(details, 1) * 1000000.0 > configMaxScriptTime) {
-                                    reason = "script time";
+                                    reason = (string)["script time (",
+                                        Float2String(llList2Float(details, 1) / 1000000.0, 3, FALSE),"/",
+                                        Float2String(configMaxScriptTime, 3, FALSE),"μs)"];
                                     eject = TRUE;
                                 }
-                                else if (configMaxScriptCount != -1 && llList2Float(details, 2) > configMaxScriptCount) {
+                                else if (configMaxScriptCount != -1 && llList2Integer(details, 2) > configMaxScriptCount) {
+                                    reason = (string)["script count (",llList2Integer(details, 2),"/",configMaxScriptCount,")"];
                                     reason = "script count";
                                     eject = TRUE;
                                 }
                                 else if (configMaxRenderWeight != -1 && llList2Float(details, 3) > configMaxRenderWeight) {
-                                    reason = "render weight";
+                                    reason = (string)["render weight (",
+                                        Float2String(llList2Float(details, 3), 1, FALSE),"/",
+                                        Float2String(configMaxRenderWeight, 1, FALSE),")"];
                                     eject = TRUE;
                                 }
-                                else if (configMaxAttachmentInventory != -1 && llList2Float(details, 4) > configMaxAttachmentInventory) {
-                                    reason = "attachment inventory";
+                                else if (configMaxAttachmentInventory != -1 && llList2Integer(details, 4) > configMaxAttachmentInventory) {
+                                    reason = (string)["attachment inventory (",llList2Integer(details, 4),"/",configMaxAttachmentInventory,")"];
                                     eject = TRUE;
                                 }
                             }
@@ -611,11 +635,11 @@ default{
                     integer mask = (integer)data;
                     if(configEjectOnNoPayment && !(mask & PAYMENT_INFO_ON_FILE)){
                         eject = TRUE;
-                        reason = "no payment info";
+                        reason = "payment info (missing)";
                     }
                     else if(configEjectOnUnusedPayment && !(mask & PAYMENT_INFO_USED)){
                         eject = TRUE;
-                        reason = "no payment info used";
+                        reason = "payment info (unused)";
                     }
                 }
                 else if(type == "age"){
@@ -624,7 +648,7 @@ default{
  
                     if(~configMinAge && days < configMinAge) {
                         eject = TRUE;
-                        reason = "account too new";
+                        reason = (string)["account too new (",days,"/",configMinAge,"days)"];
                     }
                 }
                 
