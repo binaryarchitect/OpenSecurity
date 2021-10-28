@@ -62,11 +62,13 @@ float configMaxScriptMemory = -1;
 float configMaxScriptTime = -1;
 integer configMaxScriptCount = -1;
 float configMaxRenderWeight = -1;
+float configMaxAvatarHeight = -1;
 integer configMaxAttachmentInventory = -1;
 integer configEjectDelay = -1;
 string configEjectDelayMessage;
 integer configEjectDelayAllowedDwell = -1;
 list configRestrictZones;
+integer configDryRun = FALSE;
 
 // Security runtime variables
 integer securityReady;
@@ -116,17 +118,6 @@ string Float2String ( float num, integer places, integer rnd) {
     return (string)num;
 }
 
-// http://wiki.secondlife.com/wiki/Geometric#Box_and_Point.2C_Intersection_Boolean
-// Copyright 2001, softSurfer (www.softsurfer.com); 2008, LSL-port by Nexii Malthus
-// This code may be freely used and modified for any purpose
-// providing that this copyright notice is included with it.
-// SoftSurfer makes no warranty for this code, and cannot be held
-// liable for any real or imagined damage resulting from its use.
-// Users of this code must verify correctness for their application.
-integer gBXx(vector A, vector Bo, vector Bs, rotation Br){
-    vector eB = 0.5*Bs; vector rA = (A-Bo)/Br;
-    return (rA.x<eB.x && rA.x>-eB.x && rA.y<eB.y && rA.y>-eB.y && rA.z<eB.z && rA.z>-eB.z); }
-
 default{
     state_entry(){
         // assign first owner
@@ -157,6 +148,7 @@ default{
             vector pos = llGetPos();
             list avs = llGetAgentList(4, []);
             vector avPos;
+            vector avSize;
             key id;
             integer observe;
             integer eject;
@@ -171,6 +163,14 @@ default{
             vector zoneSize;
             rotation zoneRot;
             
+            // Geometric vars
+            vector gBXx_eB;
+            vector gBXx_rA;
+            integer gBXx;
+            
+            
+            integer pendingEjection;
+            integer pendingDataChecks;
             integer needsObjectDetails = llListStatistics(LIST_STAT_MAX, [
                     configMaxScriptMemory, 
                     configMaxScriptTime,
@@ -179,15 +179,16 @@ default{
                     configMaxAttachmentInventory
                 ]) != -1;
             
-            while(llGetListLength(avs) && (llOverMyLand(llGetKey()) || configUseEstate)){
+            while(llGetListLength(avs) && (llOverMyLand(llGetKey()) || configUseEstate || configDryRun)){
                 id = llList2Key(avs, 0);
                 avs = llDeleteSubList(avs, 0, 0);
                 if(
-                    id != securitySuperAdmin &&                       // always ignore owner
-                    (llOverMyLand(id) || configUseEstate) &&    // have eject capabilities
-                    !~llListFindList(configWhitelist, [id]) &&  // not on the whitelist
-                    !~llListFindList(securityEjectQueue, [id])  // not pending ejection
+                    id != securitySuperAdmin &&                 // always ignore owner
+                    (llOverMyLand(id) || configUseEstate || configDryRun) &&    // have eject capabilities
+                    !~llListFindList(configWhitelist, [id])     // not on the whitelist
                     ){
+                    pendingDataChecks = llListFindList(securityDataChecks, [id]);
+                    pendingEjection = llListFindList(securityEjectQueue, [id]);
                     eject = FALSE;
                     reason = "";
                     observe = TRUE;
@@ -200,7 +201,19 @@ default{
                             zoneSize = llList2Vector(configRestrictZones, i+1);
                             zoneRot = llList2Rot(configRestrictZones, i+2);
                             
-                            if(gBXx(avPos, zonePos, zoneSize, zoneRot))
+                            // http://wiki.secondlife.com/wiki/Geometric#Box_and_Point.2C_Intersection_Boolean
+                            // Copyright 2001, softSurfer (www.softsurfer.com); 2008, LSL-port by Nexii Malthus
+                            // This code may be freely used and modified for any purpose
+                            // providing that this copyright notice is included with it.
+                            // SoftSurfer makes no warranty for this code, and cannot be held
+                            // liable for any real or imagined damage resulting from its use.
+                            // Users of this code must verify correctness for their application.
+                            // integer gBXx(vector A, vector Bo, vector Bs, rotation Br)
+                            gBXx_eB = 0.5*zoneSize; 
+                            gBXx_rA = (avPos-zonePos)/zoneRot;
+                            gBXx = (gBXx_rA.x<gBXx_eB.x && gBXx_rA.x>-gBXx_eB.x && gBXx_rA.y<gBXx_eB.y && gBXx_rA.y>-gBXx_eB.y && gBXx_rA.z<gBXx_eB.z && gBXx_rA.z>-gBXx_eB.z);
+                            
+                            if(gBXx)
                                 observe = TRUE;
                         }
                     }
@@ -212,7 +225,7 @@ default{
                     
                     
                     if (observe){
-                        if(!~llListFindList(securityPresence, [id])){
+                        if(!~llListFindList(securityPresence, [id]) && !~pendingEjection){
                             securityPresence += id;
                             // some things we only need to check once
                             if (~configMinAge) 
@@ -233,6 +246,10 @@ default{
                             }
                             else if (configEjectOnGroup && !llSameGroup(id)){
                                 reason = "group";
+                                eject = TRUE;
+                            }
+                            else if (configMaxAvatarHeight != -1 && avSize.z > configMaxAvatarHeight){
+                                reason = (string)["height (",Float2String(avSize.z,2,FALSE),"/",Float2String(configMaxAvatarHeight,2,FALSE),"m)"];
                                 eject = TRUE;
                             }
                             else if (needsObjectDetails){ 
@@ -272,9 +289,22 @@ default{
                                 }
                             }
                         }
-                        if (eject){
-                            securityEjectQueue += [id, reason, 0, llGetUnixTime()];
-                        }
+                    }
+                    
+                    if (eject && !~pendingEjection){
+                        securityEjectQueue += [id, reason, 0, llGetUnixTime()];
+                    }
+                    else if ((!eject || !observe) && ~pendingEjection && !~pendingDataChecks){
+                        if(!observe)
+                            reason = "left area";
+                        else
+                            reason = llList2String(securityEjectQueue, pendingEjection + 1);
+                        securityEjectQueue = llDeleteSubList(securityEjectQueue, pendingEjection, pendingEjection + 3);
+                        llDialog(id, (string)[
+                            "📉️ All Clear️",
+                            "\nYou are no in volation of the rules.",
+                            "\n\tResolved: ",reason
+                            ], ["Ok"], -100);
                     }
                 }
             }
@@ -334,19 +364,22 @@ default{
                 
                 if(!isOwner && canEject && !isWaiting){
                     // inform avatar of actions being taken
-                    llRegionSayTo(id, 0, "You are being ejected from this land. Reason: "+reason);
+                    announcement = (string)[llList2String(["","DRYRUN | "], configDryRun), "You are being ejected from this land. Reason: ", reason];
+                    llRegionSayTo(id, 0, announcement);
                     
-                    // determine removal mechanism
-                    if(configEjectWithTP) llTeleportAgentHome(id);
-                    else llEjectFromLand(id);
-                    
-                    // determine if we need to modify the ban list
-                    if(configTimeBan >= 0 && !configUseEstate && overOurLand) {
-                        llAddToLandBanList(id, configTimeBan);
-                    } else if(configUseEstate){
-                        result = llManageEstateAccess(ESTATE_ACCESS_BANNED_AGENT_ADD, id);
-                        if(!result){
-                            securityEstateFailures++;
+                    if(!configDryRun){
+                        // determine removal mechanism
+                        if(configEjectWithTP) llTeleportAgentHome(id);
+                        else llEjectFromLand(id);
+                        
+                        // determine if we need to modify the ban list
+                        if(configTimeBan >= 0 && !configUseEstate && overOurLand) {
+                            llAddToLandBanList(id, configTimeBan);
+                        } else if(configUseEstate){
+                            result = llManageEstateAccess(ESTATE_ACCESS_BANNED_AGENT_ADD, id);
+                            if(!result){
+                                securityEstateFailures++;
+                            }
                         }
                     }
                     
@@ -448,7 +481,7 @@ default{
                     
                     // Display settings
                     if (configTimeBan != -1)
-                        llOwnerSay((string)["👉 Set to ban from parcel for ",configTimeBan," hours"]);
+                        llOwnerSay((string)["👉 Set to ban from parcel for ",Float2String(configTimeBan, 2, FALSE)," hours"]);
                     else
                         llOwnerSay((string)["👉 Set to never ban from parcel"]);
                     
@@ -457,7 +490,7 @@ default{
                     if (configRange == -1)
                         llOwnerSay((string)["👉 Set to monitor the entire region"]);
                     else
-                        llOwnerSay((string)["👉 Set to monitor all agents within", llRound(configRange), "m"]);
+                        llOwnerSay((string)["👉 Set to monitor all agents within", Float2String(configRange, 2, FALSE), "m"]);
                     
                     if (llGetListLength(configRestrictZones))
                         llOwnerSay((string)["👉 Loaded ", llGetListLength(configRestrictZones)/3, " zones"]);
@@ -472,19 +505,22 @@ default{
                         llOwnerSay((string)["👉 Set only allow avatars older than ", configMinAge, " days"]);
                         
                     if (configMaxScriptMemory != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars with more than ", configMaxScriptMemory, " kb script memory"]);
+                        llOwnerSay((string)["👉 Set to eject avatars with more than ", Float2String(configMaxScriptMemory, 2, FALSE), " kb script memory"]);
                         
                     if (configMaxScriptTime != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars with more than ", configMaxScriptTime, "μs script time"]);
+                        llOwnerSay((string)["👉 Set to eject avatars with more than ", Float2String(configMaxScriptTime, 3, FALSE), "μs script time"]);
                         
                     if (configMaxScriptCount != -1)
                         llOwnerSay((string)["👉 Set to eject avatars with more than ", configMaxScriptCount, " scripts"]);
                         
                     if (configMaxRenderWeight != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars with a render weight higher than ", configMaxRenderWeight]);
+                        llOwnerSay((string)["👉 Set to eject avatars with a render weight higher than ", Float2String(configMaxRenderWeight, 2, FALSE)]);
                         
                     if (configMaxAttachmentInventory != -1)
                         llOwnerSay((string)["👉 Set to eject avatars with attachment inventory including more than ", configMaxAttachmentInventory, " items"]);
+                        
+                    if (configMaxAvatarHeight != -1)
+                        llOwnerSay((string)["👉 Set to eject avatars are taller than ", Float2String(configMaxAvatarHeight, 2, FALSE), "m"]);
                         
                     if(configEjectOnGroup)
                         llOwnerSay((string)["👉 Set to eject when an avatar has the wrong group"]);
@@ -511,15 +547,27 @@ default{
                     if (configRange != -1 && llGetListLength(configRestrictZones))
                         llOwnerSay((string)["⚠️ Conflict (scanRange, restrictZones): Zone restriction is not compatible with scanRange config."]);
                     
-                    if (llListStatistics(LIST_STAT_MAX, [
-                        configMinAge,
-                        configMaxScriptMemory,
-                        configMaxScriptTime,
-                        configMaxScriptCount,
-                        configMaxRenderWeight,
-                        configMaxAttachmentInventory
-                        ]) == -1)
-                        llOwnerSay((string)["⚠️ Warning: No restrictions defined, no avatars will be ejected."]);
+                    if (
+                        llListStatistics(LIST_STAT_MAX, [
+                            configMinAge,
+                            configMaxScriptMemory,
+                            configMaxScriptTime,
+                            configMaxScriptCount,
+                            configMaxRenderWeight,
+                            configMaxAttachmentInventory
+                            ]) == -1
+                        && llListStatistics(LIST_STAT_MAX, [
+                            configEjectOnGroup,
+                            configEjectOnFlying,
+                            configEjectOnAfk,
+                            configEjectOnNoPayment,
+                            configEjectOnUnusedPayment
+                            ]) == 0
+                        )
+                        llOwnerSay((string)["⚠️ Warning: No restrictions defined, no avatars will be evaluated."]);
+
+                    if(configDryRun)
+                        llOwnerSay((string)["⚠️ Warning: Dry Run enabled, no avatars will be ejected."]);
                     
                 }
                 else if (ncName == "whitelist"){
@@ -580,6 +628,8 @@ default{
                             configMaxScriptCount = (integer)val;
                         else if (var == "maxrenderweight")
                             configMaxRenderWeight = (float)val;
+                        else if (var == "maxavatarheight")
+                            configMaxAvatarHeight = (float)val;
                         else if (var == "maxattachmentinventory")
                             configMaxAttachmentInventory = (integer)val;
                         else if (var == "useestate") 
@@ -592,6 +642,7 @@ default{
                             configEjectDelayAllowedDwell = (integer)val;
                         else if (var == "restrictzone") {
                             val = (string)llParseStringKeepNulls(val, [" "], []);
+                            val = llGetSubString(val, 1, -2);
                             tokens = llParseString2List(val, [">,<",","], []);
                             configRestrictZones += [
                                 <   (float)llList2String(tokens, 0),
@@ -609,6 +660,8 @@ default{
                                 >
                             ];
                         }
+                        else if (var == "dryrun") 
+                            configDryRun = !!~llListFindList(optionsBoolTrue, [llToLower(val)]);
                     }
                 }
                 else if(ncName == "whitelist"){
@@ -718,7 +771,11 @@ default{
                     "\nby BinaryArchitect",
                     "\n----------------"
                     ];
-                if (configUseEstate) {
+                if (configDryRun){
+                    text += "\nDRY RUN: Will not eject";
+                    color = <0,0,1>;
+                }
+                else if (configUseEstate) {
                     color = <0,0.8,0>;
                     text += (string)["\nSystem Active"];
                     text += (string)["\nEstate Mode"];
