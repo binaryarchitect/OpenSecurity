@@ -1,3 +1,6 @@
+// use this to test configurations without kicking out avatars
+dryRun, no
+
 // the length of time in hours ejected avatars should stay on your land ban list. 
 // -1 = do not ban, 0 = ban forever, 0.5 = ban for half hour
 timeToBan, -1
@@ -33,6 +36,10 @@ maxScriptCount, -1
 // -1 = disabled
 maxRenderWeight, -1
 
+// maximum height an avatar can be
+// -1 = disabled
+maxAvatarHeight, -1
+
 // maximum number of inventory items an attachment can contain
 // -1 = disabled
 maxAttachmentInventory, -1
@@ -60,7 +67,7 @@ showHoverText, yes
 
 // delay before warning the avatar in seconds (min 0, max 60)
 // -1 = disabled
-ejectDelayAllowedDwell, 15
+ejectDelayAllowedDwell, 5
 
 // delay to remove the avatar in seconds, (min 0, max 60)
 // -1 = disabled
@@ -73,4 +80,4 @@ ejectDelayMessage, {username}, you will be removed in {delay} seconds. Failed ch
 // restrict focus to a specific bounding box
 // definition: restrictZone, regionPos, boxSize, boxRotation
 // example: restrictZone, <128,128,1100>, <256, 256, 200>, <0,0,0,1>
-// restrictZone, <128,128,3000>, <256, 256, 200>, <0,0,0,1>
+// restrictZone, <128,128,3500>, <256, 256, 200>, <0,0,0,1>
