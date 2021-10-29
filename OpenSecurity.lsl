@@ -101,21 +101,9 @@ integer date2days(string data){
     return days;
 }
 
-// https://wiki.secondlife.com/wiki/Float2String
-string Float2String ( float num, integer places, integer rnd) { 
-    if (rnd) {
-        float f = llPow( 10.0, places );
-        integer i = llRound(llFabs(num) * f);
-        string s = "00000" + (string)i; // number of 0s is (value of max places - 1 )
-        if(num < 0.0)
-            return "-" + (string)( (integer)(i / f) ) + "." + llGetSubString( s, -places, -1);
-        return (string)( (integer)(i / f) ) + "." + llGetSubString( s, -places, -1);
-    }
-    if (!places)
-        return (string)((integer)num );
-    if ( (places = (places - 7 - (places < 1) ) ) & 0x80000000)
-        return llGetSubString((string)num, 0, places);
-    return (string)num;
+string floatToString(float num, integer precision){
+    if (precision >= 6) return (string)num;
+    else return llGetSubString((string)num,0,-6 + precision - 1);
 }
 
 default{
@@ -249,7 +237,7 @@ default{
                                 eject = TRUE;
                             }
                             else if (configMaxAvatarHeight != -1 && avSize.z > configMaxAvatarHeight){
-                                reason = (string)["height (",Float2String(avSize.z,2,FALSE),"/",Float2String(configMaxAvatarHeight,2,FALSE),"m)"];
+                                reason = (string)["height (",floatToString(avSize.z,2),"/",floatToString(configMaxAvatarHeight,2),"m)"];
                                 eject = TRUE;
                             }
                             else if (needsObjectDetails){ 
@@ -262,14 +250,14 @@ default{
                                     ]);
                                 if (configMaxScriptMemory != -1 && llList2Float(details, 0) / 1024.0 > configMaxScriptMemory) {
                                     reason = (string)["script memory (",
-                                        Float2String(llList2Float(details, 0) / 1024.0, 2, FALSE),"/",
-                                        Float2String(configMaxScriptMemory, 2, FALSE),"kb)"];
+                                        floatToString(llList2Float(details, 0) / 1024.0, 2),"/",
+                                        floatToString(configMaxScriptMemory, 2),"kb)"];
                                     eject = TRUE;
                                 }
                                 else if (configMaxScriptTime != -1 && llList2Float(details, 1) * 1000000.0 > configMaxScriptTime) {
                                     reason = (string)["script time (",
-                                        Float2String(llList2Float(details, 1) / 1000000.0, 3, FALSE),"/",
-                                        Float2String(configMaxScriptTime, 3, FALSE),"μs)"];
+                                        floatToString(llList2Float(details, 1) / 1000000.0, 3),"/",
+                                        floatToString(configMaxScriptTime, 3),"μs)"];
                                     eject = TRUE;
                                 }
                                 else if (configMaxScriptCount != -1 && llList2Integer(details, 2) > configMaxScriptCount) {
@@ -279,8 +267,8 @@ default{
                                 }
                                 else if (configMaxRenderWeight != -1 && llList2Float(details, 3) > configMaxRenderWeight) {
                                     reason = (string)["render weight (",
-                                        Float2String(llList2Float(details, 3), 1, FALSE),"/",
-                                        Float2String(configMaxRenderWeight, 1, FALSE),")"];
+                                        floatToString(llList2Float(details, 3), 1),"/",
+                                        floatToString(configMaxRenderWeight, 1),")"];
                                     eject = TRUE;
                                 }
                                 else if (configMaxAttachmentInventory != -1 && llList2Integer(details, 4) > configMaxAttachmentInventory) {
@@ -481,7 +469,7 @@ default{
                     
                     // Display settings
                     if (configTimeBan != -1)
-                        llOwnerSay((string)["👉 Set to ban from parcel for ",Float2String(configTimeBan, 2, FALSE)," hours"]);
+                        llOwnerSay((string)["👉 Set to ban from parcel for ",floatToString(configTimeBan, 2)," hours"]);
                     else
                         llOwnerSay((string)["👉 Set to never ban from parcel"]);
                     
@@ -490,7 +478,7 @@ default{
                     if (configRange == -1)
                         llOwnerSay((string)["👉 Set to monitor the entire region"]);
                     else
-                        llOwnerSay((string)["👉 Set to monitor all agents within", Float2String(configRange, 2, FALSE), "m"]);
+                        llOwnerSay((string)["👉 Set to monitor all agents within", floatToString(configRange, 2), "m"]);
                     
                     if (llGetListLength(configRestrictZones))
                         llOwnerSay((string)["👉 Loaded ", llGetListLength(configRestrictZones)/3, " zones"]);
@@ -505,22 +493,22 @@ default{
                         llOwnerSay((string)["👉 Set only allow avatars older than ", configMinAge, " days"]);
                         
                     if (configMaxScriptMemory != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars with more than ", Float2String(configMaxScriptMemory, 2, FALSE), " kb script memory"]);
+                        llOwnerSay((string)["👉 Set to eject avatars with more than ", floatToString(configMaxScriptMemory, 2), " kb script memory"]);
                         
                     if (configMaxScriptTime != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars with more than ", Float2String(configMaxScriptTime, 3, FALSE), "μs script time"]);
+                        llOwnerSay((string)["👉 Set to eject avatars with more than ", floatToString(configMaxScriptTime, 3), "μs script time"]);
                         
                     if (configMaxScriptCount != -1)
                         llOwnerSay((string)["👉 Set to eject avatars with more than ", configMaxScriptCount, " scripts"]);
                         
                     if (configMaxRenderWeight != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars with a render weight higher than ", Float2String(configMaxRenderWeight, 2, FALSE)]);
+                        llOwnerSay((string)["👉 Set to eject avatars with a render weight higher than ", floatToString(configMaxRenderWeight, 2)]);
                         
                     if (configMaxAttachmentInventory != -1)
                         llOwnerSay((string)["👉 Set to eject avatars with attachment inventory including more than ", configMaxAttachmentInventory, " items"]);
                         
                     if (configMaxAvatarHeight != -1)
-                        llOwnerSay((string)["👉 Set to eject avatars are taller than ", Float2String(configMaxAvatarHeight, 2, FALSE), "m"]);
+                        llOwnerSay((string)["👉 Set to eject avatars are taller than ", floatToString(configMaxAvatarHeight, 2), "m"]);
                         
                     if(configEjectOnGroup)
                         llOwnerSay((string)["👉 Set to eject when an avatar has the wrong group"]);
